@@ -1,6 +1,7 @@
 package cl.camodev.wosbot.emulator.impl;
 
 import cl.camodev.wosbot.emulator.Emulator;
+import com.android.ddmlib.IDevice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,11 +65,19 @@ public class AndroidStudioEmulator extends Emulator {
     public boolean isRunning(String emulatorNumber) {
         try {
             String deviceSerial = getDeviceSerial(emulatorNumber);
-            // Check if the device exists in ADB devices list
-            return withRetries(emulatorNumber, device -> {
-                // If we can get the device, it's running
-                return device != null && device.isOnline();
-            }, "isRunning");
+            
+            // Directly check if device is available without using withRetries to avoid recursion
+            if (bridge == null) {
+                initializeBridge();
+            }
+            
+            IDevice[] devices = bridge.getDevices();
+            for (IDevice device : devices) {
+                if (deviceSerial.equals(device.getSerialNumber()) && device.isOnline()) {
+                    return true;
+                }
+            }
+            return false;
         } catch (Exception e) {
             logger.debug("Emulator {} is not running or not responsive: {}", emulatorNumber, e.getMessage());
             return false;

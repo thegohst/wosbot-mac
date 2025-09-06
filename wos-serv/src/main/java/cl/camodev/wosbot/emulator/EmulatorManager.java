@@ -63,16 +63,15 @@ public class EmulatorManager {
 			EmulatorType emulatorType = EmulatorType.valueOf(savedActiveEmulator);
 			String consolePath = globalConfig.get(emulatorType.getConfigKey());
 
-			if (consolePath == null || consolePath.isEmpty()) {
-				throw new IllegalStateException("No path found for the selected emulator: " + emulatorType.getDisplayName());
-			}
-
-			// Only Android Studio emulators are supported
-			if (emulatorType == EmulatorType.ANDROID_STUDIO) {
-				this.emulator = new AndroidStudioEmulator(consolePath);
-			} else {
-				throw new IllegalArgumentException("Unsupported emulator type: " + emulatorType);
-			}
+		// Only Android Studio emulators are supported
+		if (emulatorType == EmulatorType.ANDROID_STUDIO) {
+			// For Android Studio emulators, consolePath can be empty (uses system ADB)
+			// or contain ADB device reference like "adb:emulator-5554"
+			String adbReference = (consolePath != null && !consolePath.isEmpty()) ? consolePath : "system";
+			this.emulator = new AndroidStudioEmulator(adbReference);
+		} else {
+			throw new IllegalArgumentException("Unsupported emulator type: " + emulatorType);
+		}
 
             logger.info("Emulator initialized: {}", emulatorType.getDisplayName());
 			//restartAdbServer();

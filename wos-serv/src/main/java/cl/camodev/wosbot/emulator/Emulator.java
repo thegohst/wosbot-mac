@@ -59,24 +59,40 @@ public abstract class Emulator {
 	 * @return Path to the ADB executable
 	 */
 	private String getProjectAdbPath() {
+		// First, try to use system ADB (user has Android SDK installed)
+		String osName = System.getProperty("os.name").toLowerCase();
+		String adbExecutable = osName.contains("win") ? "adb.exe" : "adb";
+		
+		// Check if system ADB is available
+		try {
+			ProcessBuilder pb = new ProcessBuilder(adbExecutable, "version");
+			Process process = pb.start();
+			if (process.waitFor() == 0) {
+				logger.info("Using system ADB: {}", adbExecutable);
+				return adbExecutable;
+			}
+		} catch (Exception e) {
+			logger.debug("System ADB not available: {}", e.getMessage());
+		}
+
 		// Get the current working directory (where the application is running)
 		String currentDir = System.getProperty("user.dir");
 
 		// Check if we're in the wos-hmi directory or the root project directory
-		File adbFile = new File(currentDir, "adb" + File.separator + "adb.exe");
+		File adbFile = new File(currentDir, "adb" + File.separator + adbExecutable);
 		if (adbFile.exists()) {
 			return adbFile.getAbsolutePath();
 		}
 
 		// Try the wos-hmi subdirectory if we're in the root
-		adbFile = new File(currentDir, "wos-hmi" + File.separator + "adb" + File.separator + "adb.exe");
+		adbFile = new File(currentDir, "wos-hmi" + File.separator + "adb" + File.separator + adbExecutable);
 		if (adbFile.exists()) {
 			return adbFile.getAbsolutePath();
 		}
 
-		// Fallback to the original console path if project ADB not found
-		logger.warn("Project ADB not found, falling back to console path: {}", consolePath);
-		return consolePath + File.separator + "adb.exe";
+		// Fallback to system adb
+		logger.info("Falling back to system ADB: {}", adbExecutable);
+		return adbExecutable;
 	}
 
 	/**
