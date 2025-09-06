@@ -47,12 +47,12 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
-import cl.camodev.wosbot.emulator.view.EmulatorSelectionDialog;
 import cl.camodev.wosbot.emulator.AdbDeviceService;
 import nu.pattern.OpenCV;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import javafx.application.Platform;
+import java.util.List;
 import javafx.stage.Stage;
 
 public class LauncherLayoutController implements IProfileLoadListener {
@@ -78,6 +78,12 @@ public class LauncherLayoutController implements IProfileLoadListener {
 
 	@FXML
 	private ComboBox<ProfileAux> profileComboBox;
+	
+	@FXML
+	private ComboBox<String> emulatorComboBox;
+	
+	@FXML
+	private Button buttonRefreshEmulators;
 
 	private Stage stage;
 
@@ -103,6 +109,7 @@ public class LauncherLayoutController implements IProfileLoadListener {
 		initializeLogModule();
 		initializeProfileModule();
 		initializeProfileComboBox();
+		initializeEmulatorDropdown();
 		initializeModules();
 		initializeExternalLibraries();
 		initializeEmulatorManager();
@@ -189,8 +196,7 @@ public class LauncherLayoutController implements IProfileLoadListener {
 				ServScheduler.getServices().saveEmulatorPath(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name(), foundEmulators.get(0).name());
 				return;
 			} else if (foundEmulators.isEmpty()) {
-				// Try ADB-based emulator selection first
-				selectEmulatorFromAdbSync();
+				// No emulators found automatically, user will need to select from dropdown
 			} else {
 				EmulatorType selectedEmulator = askUserForPreferredEmulator(foundEmulators);
 				ServScheduler.getServices().saveEmulatorPath(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name(), selectedEmulator.name());
@@ -223,67 +229,9 @@ public class LauncherLayoutController implements IProfileLoadListener {
 		return null; // Nunca debería llegar aquí porque el sistema se cerrará antes.
 	}
 
-	private void selectEmulatorFromAdb() {
-		// First try to find running emulators via ADB
-		// Use Platform.runLater to ensure JavaFX is properly initialized
-		Platform.runLater(() -> {
-			Optional<AdbDeviceService.AdbDevice> selectedDevice = EmulatorSelectionDialog.showAndWait(stage);
-			handleEmulatorSelection(selectedDevice);
-		});
-	}
 	
-	private void selectEmulatorFromAdbSync() {
-		// Synchronous version for initialization - JavaFX should be ready by now
-		try {
-			Optional<AdbDeviceService.AdbDevice> selectedDevice = EmulatorSelectionDialog.showAndWait(stage);
-			handleEmulatorSelection(selectedDevice);
-		} catch (Exception e) {
-			// If ADB dialog fails, fall back to file chooser
-			System.err.println("ADB selection failed: " + e.getMessage());
-			selectEmulatorManually();
-		}
-	}
 	
-	private void handleEmulatorSelection(Optional<AdbDeviceService.AdbDevice> selectedDevice) {
-		if (selectedDevice.isPresent()) {
-			AdbDeviceService.AdbDevice device = selectedDevice.get();
-			
-			if (device.getType() != null) {
-				// Device type was detected automatically
-				ServScheduler.getServices().saveEmulatorPath(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name(), device.getType().name());
-				
-				// For Android Studio emulators, we don't need to save a path since they're managed via ADB
-				if (device.getType() == EmulatorType.ANDROID_STUDIO) {
-					ServScheduler.getServices().saveEmulatorPath(device.getType().getConfigKey(), "adb:" + device.getDeviceId());
-				}
-				return;
-			} else {
-				// Device type not detected, ask user to select type or use file chooser as fallback
-				EmulatorType selectedType = askUserForEmulatorType();
-				if (selectedType != null) {
-					ServScheduler.getServices().saveEmulatorPath(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name(), selectedType.name());
-					
-					if (selectedType == EmulatorType.ANDROID_STUDIO) {
-						ServScheduler.getServices().saveEmulatorPath(selectedType.getConfigKey(), "adb:" + device.getDeviceId());
-					}
-					return;
-				}
-			}
-		}
-		
-		// Fallback to file chooser if ADB selection fails or user cancels
-		selectEmulatorManually();
-	}
-	
-	private EmulatorType askUserForEmulatorType() {
-		// Since we only support Android Studio emulators now, just return that
-		return EmulatorType.ANDROID_STUDIO;
-	}
 
-	private void selectEmulatorManually() {
-		// Direct ADB selection since we only support Android Studio emulators
-		selectEmulatorFromAdbSync();
-	}
 
 	private void showErrorAndExit(String message) {
 		Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -562,6 +510,142 @@ public class LauncherLayoutController implements IProfileLoadListener {
 			return null;
 		}
 		return type.cast(controller);
+	}
+
+	/**
+	 * Initialize the emulator dropdown with available ADB devices
+	 */
+	private void initializeEmulatorDropdown() {
+		// Set up the emulator ComboBox
+		emulatorComboBox.setPromptText("Select an emulator...");
+		
+		// Add change listener to save selection
+		emulatorComboBox.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+			if (newValue != null && !updatingComboBox) {
+				saveEmulatorSelection(newValue);
+			}
+		});
+		
+		// Load available emulators
+		loadAvailableEmulators();
+		
+		// Load saved selection
+		loadSavedEmulatorSelection();
+	}
+	
+	/**
+	 * Load available emulators from ADB and populate the dropdown
+	 */
+	private void loadAvailableEmulators() {
+		Platform.runLater(() -> {
+			try {
+				emulatorComboBox.getItems().clear();
+				
+				// Get connected devices via ADB
+				List<AdbDeviceService.AdbDevice> devices = AdbDeviceService.getConnectedDevices();
+				
+				for (AdbDeviceService.AdbDevice device : devices) {
+					String displayText = String.format("%s (%s)", device.getName(), device.getDeviceId());
+					emulatorComboBox.getItems().add(displayText);
+				}
+				
+				if (emulatorComboBox.getItems().isEmpty()) {
+					emulatorComboBox.getItems().add("No emulators detected");
+					emulatorComboBox.setDisable(true);
+				} else {
+					emulatorComboBox.setDisable(false);
+				}
+			} catch (Exception e) {
+				logger.error("Failed to load available emulators: {}", e.getMessage());
+				emulatorComboBox.getItems().clear();
+				emulatorComboBox.getItems().add("Error loading emulators");
+				emulatorComboBox.setDisable(true);
+			}
+		});
+	}
+	
+	/**
+	 * Save the selected emulator to configuration
+	 */
+	private void saveEmulatorSelection(String selectedEmulator) {
+		try {
+			// Extract device ID from the display text
+			String deviceId = extractDeviceId(selectedEmulator);
+			
+			if (deviceId != null) {
+				// Save as Android Studio emulator with ADB device reference
+				ServScheduler.getServices().saveEmulatorPath(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name(), EmulatorType.ANDROID_STUDIO.name());
+				ServScheduler.getServices().saveEmulatorPath(EmulatorType.ANDROID_STUDIO.getConfigKey(), "adb:" + deviceId);
+				
+				// Enable start button now that emulator is selected
+				if (buttonStartStop != null) {
+					buttonStartStop.setDisable(false);
+				}
+				
+				logger.info("Emulator selection saved: {}", selectedEmulator);
+			}
+		} catch (Exception e) {
+			logger.error("Failed to save emulator selection: {}", e.getMessage());
+		}
+	}
+	
+	/**
+	 * Load the saved emulator selection from configuration
+	 */
+	private void loadSavedEmulatorSelection() {
+		try {
+			HashMap<String, String> globalConfig = ServConfig.getServices().getGlobalConfig();
+			String savedEmulator = globalConfig.get(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name());
+			String savedPath = globalConfig.get(EmulatorType.ANDROID_STUDIO.getConfigKey());
+			
+			if (EmulatorType.ANDROID_STUDIO.name().equals(savedEmulator) && savedPath != null && savedPath.startsWith("adb:")) {
+				String deviceId = savedPath.substring(4); // Remove "adb:" prefix
+				
+				// Find and select the matching item in the dropdown
+				for (String item : emulatorComboBox.getItems()) {
+					if (item.contains(deviceId)) {
+						updatingComboBox = true;
+						emulatorComboBox.getSelectionModel().select(item);
+						updatingComboBox = false;
+						
+						// Enable start button since emulator is already configured
+						if (buttonStartStop != null) {
+							buttonStartStop.setDisable(false);
+						}
+						break;
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Failed to load saved emulator selection: {}", e.getMessage());
+		}
+	}
+	
+	/**
+	 * Extract device ID from dropdown display text
+	 */
+	private String extractDeviceId(String displayText) {
+		if (displayText == null || displayText.equals("No emulators detected") || displayText.equals("Error loading emulators")) {
+			return null;
+		}
+		
+		// Extract device ID from "Name (device-id)" format
+		int start = displayText.lastIndexOf('(');
+		int end = displayText.lastIndexOf(')');
+		
+		if (start != -1 && end != -1 && end > start) {
+			return displayText.substring(start + 1, end);
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * Handle refresh emulators button click
+	 */
+	@FXML
+	public void handleButtonRefreshEmulators(ActionEvent event) {
+		loadAvailableEmulators();
 	}
 
 	private record ModuleDefinition(String fxmlName, String buttonTitle, Supplier<Object> controllerSupplier) {

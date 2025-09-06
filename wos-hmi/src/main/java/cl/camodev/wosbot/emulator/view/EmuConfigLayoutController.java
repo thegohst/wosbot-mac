@@ -1,6 +1,8 @@
 package cl.camodev.wosbot.emulator.view;
 
 import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
 
 import cl.camodev.wosbot.console.enumerable.EnumConfigurationKey;
 import cl.camodev.wosbot.emulator.EmulatorType;
@@ -12,6 +14,7 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
@@ -182,15 +185,46 @@ public class EmuConfigLayoutController {
 	}
 	
 	private void selectEmulatorFromAdb(EmulatorAux emulator) {
-		Optional<AdbDeviceService.AdbDevice> selectedDevice = EmulatorSelectionDialog.showAndWait(null);
-		
-		if (selectedDevice.isPresent()) {
-			AdbDeviceService.AdbDevice device = selectedDevice.get();
+		try {
+			// Get available ADB devices
+			List<AdbDeviceService.AdbDevice> devices = AdbDeviceService.getConnectedDevices();
 			
-			// Save the ADB device ID for Android Studio emulator
-			emulator.setPath("adb:" + device.getDeviceId());
-			tableviewEmulators.refresh();
-			showInfo("Android device/emulator connected: " + device.getName());
+			if (devices.isEmpty()) {
+				showError("No Android devices/emulators detected via ADB.");
+				return;
+			}
+			
+			// Create choice dialog
+			ChoiceDialog<String> dialog = new ChoiceDialog<>();
+			dialog.setTitle("Select Android Device/Emulator");
+			dialog.setHeaderText("Choose from available Android devices and emulators:");
+			
+			// Populate choices
+			List<String> choices = new ArrayList<>();
+			for (AdbDeviceService.AdbDevice device : devices) {
+				String displayText = String.format("%s (%s)", device.getName(), device.getDeviceId());
+				choices.add(displayText);
+			}
+			
+			dialog.getItems().addAll(choices);
+			dialog.setSelectedItem(choices.get(0));
+			
+			// Show dialog and handle selection
+			Optional<String> result = dialog.showAndWait();
+			if (result.isPresent()) {
+				String selectedChoice = result.get();
+				// Extract device ID from the display text
+				String deviceId = selectedChoice.substring(selectedChoice.lastIndexOf('(') + 1, selectedChoice.lastIndexOf(')'));
+				
+				// Save the ADB device ID for Android Studio emulator
+				emulator.setPath("adb:" + deviceId);
+				tableviewEmulators.refresh();
+				showInfo("Android Studio emulator connected: " + selectedChoice);
+			} else {
+				showError("No Android device/emulator selected.");
+			}
+		} catch (Exception e) {
+			showError("Failed to get ADB devices: " + e.getMessage());
 		}
 	}
 }
