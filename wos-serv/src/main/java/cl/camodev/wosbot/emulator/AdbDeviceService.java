@@ -147,37 +147,12 @@ public class AdbDeviceService {
     }
     
     /**
-     * Determines the emulator type based on device properties
+     * Determines the emulator type - now only supports Android Studio emulators
      */
     private static EmulatorType determineEmulatorType(String deviceName, String brand, String manufacturer, String deviceId) {
-        if (deviceName == null && brand == null && manufacturer == null) {
-            return null;
-        }
-        
-        String combined = (deviceName + " " + brand + " " + manufacturer).toLowerCase();
-        
-        // Check for MuMu emulator
-        if (combined.contains("mumu") || combined.contains("netease")) {
-            return EmulatorType.MUMU;
-        }
-        
-        // Check for MEmu emulator
-        if (combined.contains("memu") || combined.contains("microvirt")) {
-            return EmulatorType.MEMU;
-        }
-        
-        // Check for LDPlayer
-        if (combined.contains("ldplayer") || combined.contains("changzhida")) {
-            return EmulatorType.LDPLAYER;
-        }
-        
-        // Check for Android Studio emulator
-        if (combined.contains("android") || combined.contains("google") || 
-            combined.contains("sdk") || deviceId.startsWith("emulator-")) {
-            return EmulatorType.ANDROID_STUDIO;
-        }
-        
-        return null; // Unknown emulator type
+        // All devices are now treated as Android Studio compatible
+        // This includes actual Android Studio emulators and physical devices
+        return EmulatorType.ANDROID_STUDIO;
     }
     
     /**

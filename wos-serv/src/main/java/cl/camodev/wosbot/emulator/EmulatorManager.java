@@ -11,9 +11,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import cl.camodev.utiles.ImageSearchUtil;
 import cl.camodev.wosbot.console.enumerable.EnumConfigurationKey;
-import cl.camodev.wosbot.emulator.impl.LDPlayerEmulator;
-import cl.camodev.wosbot.emulator.impl.MEmuEmulator;
-import cl.camodev.wosbot.emulator.impl.MuMuEmulator;
+import cl.camodev.wosbot.emulator.impl.AndroidStudioEmulator;
 import cl.camodev.wosbot.ot.DTOImageSearchResult;
 import cl.camodev.wosbot.ot.DTOPoint;
 import cl.camodev.wosbot.ot.DTOProfiles;
@@ -69,17 +67,10 @@ public class EmulatorManager {
 				throw new IllegalStateException("No path found for the selected emulator: " + emulatorType.getDisplayName());
 			}
 
-			switch (emulatorType) {
-			case MUMU:
-				this.emulator = new MuMuEmulator(consolePath);
-				break;
-			case MEMU:
-				this.emulator = new MEmuEmulator(consolePath);
-				break;
-			case LDPLAYER:
-				this.emulator = new LDPlayerEmulator(consolePath);
-				break;
-			default:
+			// Only Android Studio emulators are supported
+			if (emulatorType == EmulatorType.ANDROID_STUDIO) {
+				this.emulator = new AndroidStudioEmulator(consolePath);
+			} else {
 				throw new IllegalArgumentException("Unsupported emulator type: " + emulatorType);
 			}
 

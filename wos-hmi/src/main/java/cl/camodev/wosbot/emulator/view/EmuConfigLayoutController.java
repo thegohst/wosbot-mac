@@ -1,6 +1,5 @@
 package cl.camodev.wosbot.emulator.view;
 
-import java.io.File;
 import java.util.HashMap;
 
 import cl.camodev.wosbot.console.enumerable.EnumConfigurationKey;
@@ -20,7 +19,6 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.stage.FileChooser;
 import cl.camodev.wosbot.emulator.AdbDeviceService;
 import java.util.Optional;
 
@@ -46,8 +44,6 @@ public class EmuConfigLayoutController {
 
 	@FXML
 	private TextField textfieldMaxIdleTime;
-
-	private final FileChooser fileChooser = new FileChooser();
 
 	// Lista fija de emuladores que se derivan del enum
 	private final ObservableList<EmulatorAux> emulatorList = FXCollections.observableArrayList();
@@ -110,22 +106,8 @@ public class EmuConfigLayoutController {
 				btn.setOnAction(event -> {
 					EmulatorAux emulator = getTableView().getItems().get(getIndex());
 					
-					// For Android Studio emulators, use ADB-based selection
-					if (emulator.getEmulatorType() == EmulatorType.ANDROID_STUDIO) {
-						selectEmulatorFromAdb(emulator);
-					} else {
-						// For other emulators, use file chooser
-						File selectedFile = openFileChooser("Select " + emulator.getEmulatorType().getExecutableName());
-						if (selectedFile != null) {
-							// Verifica que el archivo seleccionado coincida con el esperado
-							if (!selectedFile.getName().equalsIgnoreCase(emulator.getEmulatorType().getExecutableName())) {
-								showError("File not valid, please select: " + emulator.getEmulatorType().getExecutableName());
-								return;
-							}
-							emulator.setPath(selectedFile.getParent());
-							tableviewEmulators.refresh();
-						}
-					}
+					// Only Android Studio emulators are supported - use ADB-based selection
+					selectEmulatorFromAdb(emulator);
 				});
 			}
 
@@ -182,12 +164,6 @@ public class EmuConfigLayoutController {
 		showInfo("Config saved successfully");
 	}
 
-	private File openFileChooser(String title) {
-		fileChooser.setTitle(title);
-		fileChooser.getExtensionFilters().clear();
-		fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Executable Files", "*.exe"));
-		return fileChooser.showOpenDialog(null);
-	}
 
 	private void showError(String message) {
 		Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -211,19 +187,10 @@ public class EmuConfigLayoutController {
 		if (selectedDevice.isPresent()) {
 			AdbDeviceService.AdbDevice device = selectedDevice.get();
 			
-			// For Android Studio emulators, save the ADB device ID
-			if (emulator.getEmulatorType() == EmulatorType.ANDROID_STUDIO) {
-				emulator.setPath("adb:" + device.getDeviceId());
-				tableviewEmulators.refresh();
-				showInfo("Android Studio emulator connected: " + device.getName());
-			} else if (device.getType() == emulator.getEmulatorType()) {
-				// Matching emulator type detected
-				emulator.setPath("adb:" + device.getDeviceId());
-				tableviewEmulators.refresh();
-				showInfo("Emulator connected: " + device.getName());
-			} else {
-				showError("Selected device does not match the expected emulator type: " + emulator.getEmulatorType().getDisplayName());
-			}
+			// Save the ADB device ID for Android Studio emulator
+			emulator.setPath("adb:" + device.getDeviceId());
+			tableviewEmulators.refresh();
+			showInfo("Android device/emulator connected: " + device.getName());
 		}
 	}
 }

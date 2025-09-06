@@ -5,9 +5,6 @@ public enum EnumConfigurationKey {
     //@formatter:off
 	BOOL_DEBUG("false", Boolean.class ),
 	DISCORD_TOKEN_STRING("", String.class),
-	MUMU_PATH_STRING("", String.class),
-	MEMU_PATH_STRING("", String.class),
-	LDPLAYER_PATH_STRING("", String.class),
 	ANDROID_STUDIO_PATH_STRING("", String.class),
 	CURRENT_EMULATOR_STRING("", String.class),
 	

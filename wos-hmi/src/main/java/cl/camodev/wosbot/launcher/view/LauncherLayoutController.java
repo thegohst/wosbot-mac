@@ -276,51 +276,13 @@ public class LauncherLayoutController implements IProfileLoadListener {
 	}
 	
 	private EmulatorType askUserForEmulatorType() {
-		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-		alert.setTitle("Select Emulator Type");
-		alert.setHeaderText("Could not determine emulator type automatically. Please select:");
-		
-		List<ButtonType> buttons = new ArrayList<>();
-		for (EmulatorType emulator : EmulatorType.values()) {
-			buttons.add(new ButtonType(emulator.getDisplayName()));
-		}
-		ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-		buttons.add(cancelButton);
-		
-		alert.getButtonTypes().setAll(buttons);
-		Optional<ButtonType> result = alert.showAndWait();
-		
-		for (EmulatorType emulator : EmulatorType.values()) {
-			if (result.isPresent() && result.get().getText().equals(emulator.getDisplayName())) {
-				return emulator;
-			}
-		}
-		
-		return null;
+		// Since we only support Android Studio emulators now, just return that
+		return EmulatorType.ANDROID_STUDIO;
 	}
 
 	private void selectEmulatorManually() {
-		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Select Emulator Executable");
-
-		FileChooser.ExtensionFilter exeFilter = new FileChooser.ExtensionFilter("Emulator Executable", "*.exe");
-		fileChooser.getExtensionFilters().add(exeFilter);
-		fileChooser.setInitialDirectory(new File(System.getProperty("user.home")));
-
-		File selectedFile = fileChooser.showOpenDialog(stage);
-
-		if (selectedFile != null) {
-			for (EmulatorType emulator : EmulatorType.values()) {
-				if (selectedFile.getName().equals(new File(emulator.getDefaultPath()).getName())) {
-					ServScheduler.getServices().saveEmulatorPath(emulator.getConfigKey(), selectedFile.getParent());
-					ServScheduler.getServices().saveEmulatorPath(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name(), emulator.name());
-					return;
-				}
-			}
-			showErrorAndExit("Invalid emulator file selected. Please select a valid emulator executable.");
-		} else {
-			showErrorAndExit("No emulator selected. The application will close.");
-		}
+		// Direct ADB selection since we only support Android Studio emulators
+		selectEmulatorFromAdbSync();
 	}
 
 	private void showErrorAndExit(String message) {

@@ -67,10 +67,8 @@ public class ServScheduler {
 		}
 		HashMap<String, String> globalsettings = ServConfig.getServices().getGlobalConfig();
 		globalsettings.forEach((key, value) -> {
-			if (key.equals(EnumConfigurationKey.MUMU_PATH_STRING.name())) {
-				saveEmulatorPath(EnumConfigurationKey.MUMU_PATH_STRING.name(), value);
-			} else if (key.equals(EnumConfigurationKey.LDPLAYER_PATH_STRING.name())) {
-				saveEmulatorPath(EnumConfigurationKey.LDPLAYER_PATH_STRING.name(), value);
+			if (key.equals(EnumConfigurationKey.ANDROID_STUDIO_PATH_STRING.name())) {
+				saveEmulatorPath(EnumConfigurationKey.ANDROID_STUDIO_PATH_STRING.name(), value);
 			}
 		});
 		List<DTOProfiles> profiles = ServProfiles.getServices().getProfiles();

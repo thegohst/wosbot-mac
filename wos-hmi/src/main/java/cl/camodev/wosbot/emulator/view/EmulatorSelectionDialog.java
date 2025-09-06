@@ -30,8 +30,8 @@ public class EmulatorSelectionDialog extends Dialog<AdbDevice> {
         if (parent != null && parent.getScene() != null) {
             initOwner(parent);
         }
-        setTitle("Select Emulator/Device");
-        setHeaderText("Choose from available Android devices/emulators connected via ADB");
+        setTitle("Select Android Device/Emulator");
+        setHeaderText("Choose from available Android devices and emulators connected via ADB");
         
         setupDialogPane();
         setupButtons();
