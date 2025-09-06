@@ -273,6 +273,23 @@ export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"  # Linux
 export DYLD_LIBRARY_PATH="/opt/homebrew/lib:$DYLD_LIBRARY_PATH"  # macOS
 ```
 
+## Enhanced Features
+
+### 🔥 Force Kill Emulator Support
+The application now includes **aggressive force kill** functionality for emulators:
+- **No save dialogs**: Emulators close immediately without confirmation prompts
+- **Multiple kill methods**: Uses escalating force levels to ensure reliable shutdown
+- **Cross-platform**: Works on Windows, macOS, and Linux with appropriate system commands
+- **Automatic cleanup**: Removes orphaned emulator processes
+
+When you click "Stop Bot" or the application needs to close an emulator, it will:
+1. Try ADB emulator kill command
+2. Kill emulator processes by name (`qemu-system`, `emulator`)  
+3. Kill processes using the emulator port
+4. Nuclear option: Kill all emulator-related processes
+
+This ensures clean shutdowns without user intervention! 🚀
+
 ## Next Steps
 
 After successful installation:

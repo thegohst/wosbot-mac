@@ -106,58 +106,119 @@ public class AndroidStudioEmulator extends Emulator {
     @Override
     public void closeEmulator(String emulatorNumber) {
         String deviceSerial = getDeviceSerial(emulatorNumber);
-        logger.info("Attempting to close Android Studio emulator: {}", deviceSerial);
+        logger.info("Force closing Android Studio emulator: {} (no confirmation dialogs)", deviceSerial);
         
         boolean closed = false;
         
-        // Method 1: Try ADB shutdown command
+        // Method 1: Force kill via ADB emu kill (most direct)
         try {
-            withRetries(emulatorNumber, device -> {
-                try {
-                    device.executeShellCommand("reboot -p", new com.android.ddmlib.NullOutputReceiver());
-                    logger.info("ADB shutdown command sent to emulator: {}", deviceSerial);
-                    return null;
-                } catch (Exception e) {
-                    logger.debug("ADB shutdown failed: {}", e.getMessage());
-                    throw new RuntimeException(e);
-                }
-            }, "closeEmulator");
+            ProcessBuilder pb = new ProcessBuilder("adb", "-s", deviceSerial, "emu", "kill");
+            Process process = pb.start();
+            int exitCode = process.waitFor();
             
-            // Wait a bit and check if it worked
-            Thread.sleep(3000);
-            if (!isRunning(emulatorNumber)) {
-                closed = true;
-                logger.info("Emulator successfully closed via ADB");
+            if (exitCode == 0) {
+                logger.info("Force kill command sent to emulator: {}", deviceSerial);
+                Thread.sleep(2000);
+                if (!isRunning(emulatorNumber)) {
+                    closed = true;
+                    logger.info("Emulator successfully force closed via emu kill");
+                }
             }
         } catch (Exception e) {
-            logger.debug("ADB method failed: {}", e.getMessage());
+            logger.debug("ADB emu kill failed: {}", e.getMessage());
         }
         
-        // Method 2: Try adb emu kill command as fallback
+        // Method 2: Kill emulator processes by name (force kill without dialogs)
+        if (!closed) {
+            try {
+                String osName = System.getProperty("os.name").toLowerCase();
+                ProcessBuilder pb;
+                
+                if (osName.contains("win")) {
+                    // Windows: Kill all emulator processes
+                    pb = new ProcessBuilder("taskkill", "/F", "/IM", "qemu-system-*.exe");
+                } else {
+                    // macOS/Linux: Kill emulator processes
+                    pb = new ProcessBuilder("pkill", "-f", "qemu-system");
+                }
+                
+                Process process = pb.start();
+                int exitCode = process.waitFor();
+                logger.info("Process kill command executed with exit code: {}", exitCode);
+                
+                Thread.sleep(2000);
+                if (!isRunning(emulatorNumber)) {
+                    closed = true;
+                    logger.info("Emulator successfully force closed via process kill");
+                }
+            } catch (Exception e) {
+                logger.debug("Process kill method failed: {}", e.getMessage());
+            }
+        }
+        
+        // Method 3: Kill by emulator port/PID (most aggressive)
         if (!closed) {
             try {
                 String port = deviceSerial.replace("emulator-", "");
-                ProcessBuilder pb = new ProcessBuilder("adb", "-s", deviceSerial, "emu", "kill");
+                String osName = System.getProperty("os.name").toLowerCase();
+                ProcessBuilder pb;
+                
+                if (osName.contains("win")) {
+                    // Windows: Find and kill process using port
+                    pb = new ProcessBuilder("cmd", "/c", 
+                        "for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :" + port + "') do taskkill /F /PID %a");
+                } else {
+                    // macOS/Linux: Kill process using port
+                    pb = new ProcessBuilder("bash", "-c", 
+                        "lsof -ti tcp:" + port + " | xargs kill -9");
+                }
+                
                 Process process = pb.start();
                 int exitCode = process.waitFor();
+                logger.info("Port-based kill command executed with exit code: {}", exitCode);
                 
-                if (exitCode == 0) {
-                    logger.info("Emulator kill command sent successfully");
-                    Thread.sleep(2000);
-                    if (!isRunning(emulatorNumber)) {
-                        closed = true;
-                        logger.info("Emulator successfully closed via emu kill");
-                    }
-                } else {
-                    logger.debug("Emulator kill command failed with exit code: {}", exitCode);
+                Thread.sleep(2000);
+                if (!isRunning(emulatorNumber)) {
+                    closed = true;
+                    logger.info("Emulator successfully force closed via port kill");
                 }
             } catch (Exception e) {
-                logger.debug("Kill command method failed: {}", e.getMessage());
+                logger.debug("Port-based kill method failed: {}", e.getMessage());
             }
         }
         
+        // Method 4: Final fallback - kill all emulator-related processes
         if (!closed) {
-            logger.warn("Could not close emulator {}. It may need to be closed manually.", deviceSerial);
+            try {
+                String osName = System.getProperty("os.name").toLowerCase();
+                ProcessBuilder pb;
+                
+                if (osName.contains("win")) {
+                    // Windows: Nuclear option - kill all emulator processes
+                    pb = new ProcessBuilder("taskkill", "/F", "/IM", "emulator.exe");
+                } else {
+                    // macOS/Linux: Nuclear option
+                    pb = new ProcessBuilder("killall", "-9", "emulator");
+                }
+                
+                Process process = pb.start();
+                int exitCode = process.waitFor();
+                logger.info("Nuclear kill command executed with exit code: {}", exitCode);
+                
+                Thread.sleep(1000);
+                closed = !isRunning(emulatorNumber);
+                if (closed) {
+                    logger.info("Emulator force closed via nuclear option");
+                }
+            } catch (Exception e) {
+                logger.debug("Nuclear kill method failed: {}", e.getMessage());
+            }
+        }
+        
+        if (closed) {
+            logger.info("Emulator {} successfully force closed without user confirmation", deviceSerial);
+        } else {
+            logger.warn("Could not force close emulator {}. Manual intervention may be required.", deviceSerial);
         }
     }
     
