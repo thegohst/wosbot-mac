@@ -549,6 +549,68 @@ public abstract class Emulator {
 	}
 
 	/**
+	 * Checks if the emulator is fully ready and responsive (not just running)
+	 * @param emulatorNumber Emulator identifier
+	 * @return true if emulator is fully ready, false otherwise
+	 */
+	public boolean isEmulatorReady(String emulatorNumber) {
+		try {
+			return withRetries(emulatorNumber, device -> {
+				try {
+					// Check if device is online and responding
+					if (!device.isOnline()) {
+						return false;
+					}
+					
+					// Test basic shell command responsiveness
+					StringBuilder output = new StringBuilder();
+					IShellOutputReceiver receiver = new IShellOutputReceiver() {
+						@Override
+						public void addOutput(byte[] data, int offset, int length) {
+							output.append(new String(data, offset, length));
+						}
+						
+						@Override
+						public void flush() {}
+						
+						@Override
+						public boolean isCancelled() {
+							return false;
+						}
+					};
+					
+					// Try a simple command with timeout
+					device.executeShellCommand("getprop sys.boot_completed", receiver, 5000);
+					String result = output.toString().trim();
+					
+					// Check if boot is completed and we get a proper response
+					boolean bootCompleted = "1".equals(result);
+					
+					if (bootCompleted) {
+						// Additional check: can we access package manager?
+						output.setLength(0);
+						device.executeShellCommand("pm list packages -s android", receiver, 3000);
+						boolean pmResponds = output.toString().contains("package:");
+						
+						logger.debug("Emulator {} readiness: boot_completed={}, pm_responds={}", 
+							emulatorNumber, bootCompleted, pmResponds);
+						
+						return pmResponds;
+					}
+					
+					return false;
+				} catch (Exception e) {
+					logger.debug("Emulator readiness check failed: {}", e.getMessage());
+					return false;
+				}
+			}, "isEmulatorReady");
+		} catch (Exception e) {
+			logger.debug("Exception during emulator readiness check: {}", e.getMessage());
+			return false;
+		}
+	}
+
+	/**
 	 * Launches an app on the emulator using monkey.
 	 * @param emulatorNumber Emulator identifier
 	 * @param packageName Package name to launch

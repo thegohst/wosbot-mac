@@ -203,6 +203,16 @@ public class EmulatorManager {
 		emulator.launchApp(emulatorNumber, packageName);
 	}
 
+	/**
+	 * Checks if the emulator is fully ready and responsive
+	 * @param emulatorNumber Emulator identifier
+	 * @return true if emulator is fully ready, false otherwise
+	 */
+	public boolean isEmulatorReady(String emulatorNumber) {
+		checkEmulatorInitialized();
+		return emulator.isEmulatorReady(emulatorNumber);
+	}
+
 	public boolean isRunning(String emulatorNumber) {
 		checkEmulatorInitialized();
 		return emulator.isRunning(emulatorNumber);

@@ -22,27 +22,62 @@ public class InitializeTask extends DelayedTask {
 	protected void execute() {
 		this.setRecurring(false);
 		ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "Checking emulator status");
+		
+		// Phase 1: Wait for emulator to be running
 		while (!isStarted) {
-
 			if (EmulatorManager.getInstance().isRunning(EMULATOR_NUMBER)) {
+				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "Emulator detected, checking readiness...");
 				isStarted = true;
-				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "emulator found");
 			} else {
-				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "emulator not found, trying to start it");
+				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "Emulator not found, trying to start it");
 				EmulatorManager.getInstance().launchEmulator(EMULATOR_NUMBER);
-				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "waiting 10 seconds before checking again");
+				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "Waiting 10 seconds before checking again");
 				sleepTask(10000);
 			}
-
 		}
+		
+		// Phase 2: Wait for emulator to be fully ready and responsive
+		ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "Waiting for emulator to be fully ready...");
+		boolean emulatorReady = false;
+		int readinessAttempts = 0;
+		final int MAX_READINESS_ATTEMPTS = 30; // 5 minutes max wait
+		
+		while (!emulatorReady && readinessAttempts < MAX_READINESS_ATTEMPTS) {
+			if (EmulatorManager.getInstance().isEmulatorReady(EMULATOR_NUMBER)) {
+				emulatorReady = true;
+				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "Emulator is fully ready and responsive!");
+			} else {
+				readinessAttempts++;
+				ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), 
+					String.format("Emulator not ready yet (attempt %d/%d), waiting 10 seconds...", readinessAttempts, MAX_READINESS_ATTEMPTS));
+				sleepTask(10000);
+			}
+		}
+		
+		if (!emulatorReady) {
+			ServLogs.getServices().appendLog(EnumTpMessageSeverity.ERROR, taskName, profile.getName(), 
+				"Emulator did not become ready after maximum wait time. Restarting emulator...");
+			EmulatorManager.getInstance().closeEmulator(EMULATOR_NUMBER);
+			isStarted = false;
+			this.setRecurring(true);
+			return;
+		}
+		
+		// Phase 3: Additional 30-second grace period
+		ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), 
+			"Emulator ready! Waiting additional 30 seconds for full stability...");
+		sleepTask(30000);
 
+		// Phase 4: Check if game is installed and launch it
 		if (!EmulatorManager.getInstance().isWhiteoutSurvivalInstalled(EMULATOR_NUMBER)) {
-			ServLogs.getServices().appendLog(EnumTpMessageSeverity.ERROR, taskName, profile.getName(), "whiteout survival not installed, stopping queue");
+			ServLogs.getServices().appendLog(EnumTpMessageSeverity.ERROR, taskName, profile.getName(), "Whiteout Survival not installed, stopping queue");
 			throw new StopExecutionException("Game not installed");
 		} else {
-
-			ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), "launching game");
+			ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), 
+				"Whiteout Survival detected! Launching game now...");
 			EmulatorManager.getInstance().launchApp(EMULATOR_NUMBER, EmulatorManager.WHITEOUT_PACKAGE);
+			ServLogs.getServices().appendLog(EnumTpMessageSeverity.INFO, taskName, profile.getName(), 
+				"Game launch command sent. Waiting 10 seconds for game to start...");
 			sleepTask(10000);
 
 			final int MAX_ATTEMPTS = 10;

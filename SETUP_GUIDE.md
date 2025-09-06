@@ -290,6 +290,42 @@ When you click "Stop Bot" or the application needs to close an emulator, it will
 
 This ensures clean shutdowns without user intervention! 🚀
 
+### ⏰ Smart Emulator Initialization
+The bot now includes **intelligent emulator startup** with proper readiness detection:
+
+**Phase 1: Emulator Detection**
+- Checks if emulator is running via ADB
+- Automatically launches emulator if not found
+- Waits up to 5 minutes for emulator to start
+
+**Phase 2: Readiness Verification** 
+- Verifies `sys.boot_completed` property is set to `1`
+- Tests package manager responsiveness 
+- Ensures shell commands are working properly
+- Maximum wait time: 5 minutes (30 attempts × 10 seconds)
+
+**Phase 3: Stability Grace Period**
+- **Additional 30-second wait** after readiness detection
+- Ensures emulator is fully stable before launching the game
+- Prevents premature app launches that might fail
+
+**Phase 4: Game Launch**
+- Checks if Whiteout Survival is installed
+- Launches the game using Android's monkey tool
+- Waits 10 seconds for game initialization
+
+**Smart Recovery**: If emulator doesn't become ready within the timeout, it automatically restarts the emulator and tries again.
+
+**Detailed Logging**: Every phase is logged so you can see exactly what's happening:
+```
+"Checking emulator status"
+"Emulator detected, checking readiness..." 
+"Waiting for emulator to be fully ready..."
+"Emulator is fully ready and responsive!"
+"Emulator ready! Waiting additional 30 seconds for full stability..."
+"Whiteout Survival detected! Launching game now..."
+```
+
 ## Next Steps
 
 After successful installation:
