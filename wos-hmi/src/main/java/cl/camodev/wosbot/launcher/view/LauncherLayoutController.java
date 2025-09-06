@@ -26,6 +26,9 @@ import cl.camodev.wosbot.intel.view.IntelLayoutController;
 import cl.camodev.wosbot.ot.DTOBotState;
 import cl.camodev.wosbot.ot.DTOLogMessage;
 import cl.camodev.wosbot.pets.view.PetsLayoutController;
+import cl.camodev.wosbot.ot.DTOProfiles;
+import cl.camodev.wosbot.ot.DTOConfig;
+import cl.camodev.wosbot.serv.impl.ServProfiles;
 import cl.camodev.wosbot.profile.model.IProfileChangeObserver;
 import cl.camodev.wosbot.profile.model.IProfileLoadListener;
 import cl.camodev.wosbot.profile.model.IProfileObserverInjectable;
@@ -577,12 +580,17 @@ public class LauncherLayoutController implements IProfileLoadListener {
 				ServScheduler.getServices().saveEmulatorPath(EnumConfigurationKey.CURRENT_EMULATOR_STRING.name(), EmulatorType.ANDROID_STUDIO.name());
 				ServScheduler.getServices().saveEmulatorPath(EmulatorType.ANDROID_STUDIO.getConfigKey(), "adb:" + deviceId);
 				
+				// IMPORTANT: Also update the profile's emulator number to match the ADB device
+				// Extract the numeric part from emulator-5556 -> 5556
+				String emulatorNumber = deviceId.replace("emulator-", "");
+				updateProfileEmulatorNumber(emulatorNumber);
+				
 				// Enable start button now that emulator is selected
 				if (buttonStartStop != null) {
 					buttonStartStop.setDisable(false);
 				}
 				
-				logger.info("Emulator selection saved: {}", selectedEmulator);
+				logger.info("Emulator selection saved: {} (Profile emulator number updated to: {})", selectedEmulator, emulatorNumber);
 			}
 		} catch (Exception e) {
 			logger.error("Failed to save emulator selection: {}", e.getMessage());
@@ -646,6 +654,47 @@ public class LauncherLayoutController implements IProfileLoadListener {
 	@FXML
 	public void handleButtonRefreshEmulators(ActionEvent event) {
 		loadAvailableEmulators();
+	}
+
+	/**
+	 * Update the current profile's emulator number to match the selected ADB device
+	 */
+	private void updateProfileEmulatorNumber(String emulatorNumber) {
+		try {
+			// Get the currently selected profile
+			ProfileAux selectedProfile = profileComboBox.getSelectionModel().getSelectedItem();
+			if (selectedProfile != null) {
+				// Update the profile's emulator number
+				selectedProfile.setEmulatorNumber(emulatorNumber);
+				
+				// Convert ProfileAux to DTOProfiles for service
+				DTOProfiles dtoProfile = new DTOProfiles(
+					selectedProfile.getId(), 
+					selectedProfile.getName(), 
+					selectedProfile.getEmulatorNumber(), 
+					selectedProfile.isEnabled(), 
+					selectedProfile.getPriority(), 
+					selectedProfile.getReconnectionTime()
+				);
+				
+				// Copy configs
+				selectedProfile.getConfigs().forEach(cfgAux -> {
+					DTOConfig dtoConfig = new DTOConfig(selectedProfile.getId(), cfgAux.getName(), cfgAux.getValue());
+					dtoProfile.getConfigs().add(dtoConfig);
+				});
+				
+				// Save using ServProfiles service directly
+				boolean success = ServProfiles.getServices().saveProfile(dtoProfile);
+				
+				if (success) {
+					logger.info("Profile '{}' emulator number updated to: {}", selectedProfile.getName(), emulatorNumber);
+				} else {
+					logger.error("Failed to save profile emulator number update");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Failed to update profile emulator number: {}", e.getMessage());
+		}
 	}
 
 	private record ModuleDefinition(String fxmlName, String buttonTitle, Supplier<Object> controllerSupplier) {
