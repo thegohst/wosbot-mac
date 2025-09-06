@@ -30,6 +30,6 @@ echo ""
 
 # Run the application
 cd wos-hmi/target
-java -cp "wos-bot-1.5.3.jar:lib/*" cl.camodev.wosbot.main.Main
+java -Djna.library.path="/opt/homebrew/lib" -cp "wos-bot-1.5.3.jar:lib/*" cl.camodev.wosbot.main.Main
 
 echo "👋 Application closed."

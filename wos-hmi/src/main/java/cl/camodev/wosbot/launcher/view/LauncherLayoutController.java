@@ -172,7 +172,8 @@ public class LauncherLayoutController implements IProfileLoadListener {
 			if (activePath != null && new File(activePath).exists()) {
 				activeEmulatorValid = true;
 			} else {
-				ServScheduler.getServices().saveEmulatorPath(activeEmulator.getConfigKey(), null); // Invalidar path no válido
+				// Skip saving null values to avoid database constraint violations
+				logger.warn("Invalid emulator path found for {}, will prompt for new selection", activeEmulator.getConfigKey());
 			}
 		}
 
